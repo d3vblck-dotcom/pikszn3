@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midnight Diner: Dev & Kalina Date</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #070709; color: #f5f6fa; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; margin: 0; padding: 5px; overflow-x: hidden; }
+        h1 { margin: 3px 0; font-size: 13px; color: #ff6b81; text-shadow: 0 0 8px rgba(255,107,129,0.5); letter-spacing: 1px; }
+        
+        #stats-bar { display: flex; justify-content: space-between; width: 100%; max-width: 450px; background: #16161a; padding: 4px 8px; border-radius: 6px 6px 0 0; border: 2px solid #ff6b81; border-bottom: none; font-size: 9px; box-sizing: border-box; }
+        .stat-item { color: #ff9ff3; font-weight: bold; }
+        
+        #connection-banner { width: 100%; max-width: 450px; background: #1e1e24; border: 2px solid #ff6b81; border-bottom: none; padding: 5px; box-sizing: border-box; display: flex; gap: 5px; font-size: 9px; align-items: center; justify-content: center; }
+        #connection-banner input { background: #000; border: 1px solid #555; color: white; padding: 3px; font-size: 9px; width: 80px; font-family: monospace; }
+        #connection-banner button { background: #2ed573; border: none; color: white; padding: 3px 8px; font-weight: bold; cursor: pointer; border-radius: 3px; font-size: 9px; }
+
+        #game-container { display: flex; flex-direction: column; width: 100%; max-width: 450px; align-items: center; position: relative; }
+        canvas { background: linear-gradient(to bottom, #090a0f, #120f18); border: 2px solid #ff6b81; touch-action: none; width: 100%; height: 260px; box-shadow: 0 0 15px rgba(0,0,0,0.8); }
+        
+        #joystick-area { position: absolute; bottom: 95px; left: 15px; width: 65px; height: 65px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; touch-action: none; }
+        #joystick-knob { width: 25px; height: 25px; background: #ff6b81; border-radius: 50%; pointer-events: none; }
+
+        #control-panel { width: 100%; max-width: 450px; background: #111115; border: 2px solid #ff6b81; border-top: none; padding: 5px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; border-radius: 0 0 8px 8px; }
+        
+        .action-row { display: flex; gap: 3px; justify-content: center; flex-wrap: wrap; }
+        button, label.upload-btn { background: #ff6b81; border: none; color: white; padding: 4px 6px; font-weight: bold; font-family: monospace; border-radius: 4px; cursor: pointer; font-size: 9px; transition: 0.2s; text-align: center; }
+        button:active, label.upload-btn:active { transform: scale(0.95); background: #ff4757; }
+        .menu-btn { background: #e67e22; display: none; }
+        .quest-btn { background: #3498db; display: none; }
+        .action-btn { background: #e74c3c; display: none; }
+        .special-btn { background: #9b59b6; display: none; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+        #prompt-display { background: #1e1e24; border: 1px dashed #ff6b81; padding: 3px; border-radius: 4px; font-size: 8px; text-align: center; color: #fdcb6e; min-height: 18px; display: flex; align-items: center; justify-content: center; }
+
+        #chat-box { width: 100%; height: 60px; background: #0a0a0c; border: 1px solid #333; border-radius: 4px; display: flex; flex-direction: column; overflow: hidden; }
+        #messages { flex: 1; padding: 3px; overflow-y: auto; font-size: 8px; display: flex; flex-direction: column; gap: 2px; }
+        #chat-input-area { display: flex; border-top: 1px solid #333; }
+        #chat-input { flex: 1; background: #000; border: none; color: white; padding: 3px; font-size: 9px; font-family: monospace; }
+        #chat-input:focus { outline: none; }
+        #send-btn { background: #2ed573; border-radius: 0; padding: 0 8px; }
+        
+        .upload-input { display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>🏍️ DEV & KALINA: MIDNIGHT RIDE 🏮</h1>
+    
+    <div id="connection-banner">
+        <span>Code: <b id="my-peer-id" style="color:#fdcb6e;">...</b></span>
+        <input type="text" id="partner-id-input" placeholder="Partner Code">
+        <button id="connect-btn">Link</button>
+    </div>
+
+    <div id="stats-bar">
+        <span>❤️ Love: <span id="love-score" class="stat-item">0</span>/3</span>
+        <span>📍 Status: <span id="location-status" class="stat-item">Kalina's House</span></span>
+        <span>🔗 Net: <span id="conn-status" class="stat-item" style="color:#ff4757;">Solo</span></span>
+    </div>
+
+    <div id="game-container">
+        <canvas id="dinerCanvas" width="450" height="260"></canvas>
+        
+        <div id="joystick-area">
+            <div id="joystick-knob"></div>
+        </div>
+
+        <div id="control-panel">
+            <div id="prompt-display">✨ Dev: Pick up Kalina at her house, then tap Ride Bike to go to the diner!</div>
+            
+            <div class="action-row">
+                <button id="ride-bike-btn" style="background:#3498db;">🏍️ Ride Bike to Diner</button>
+                <button id="enter-diner-btn" class="menu-btn">🚪 Enter Diner</button>
+                <button class="menu-btn" data-food="Ramen 🍜">🍜 Ramen</button>
+                <button class="menu-btn" data-food="Laphing 🥟">🥟 Laphing</button>
+                <button class="menu-btn" data-food="Tteokbokki 🌶️">🌶️ Tteokbokki</button>
+                <button class="quest-btn" id="question-btn">💬 Question</button>
+                <button id="ambush-btn" style="background:#e67e22;">⚠️ Ambush!</button>
+                <button id="shoot-btn" class="action-btn">🔫 SHOOT THUG</button>
+                <button id="kiss-btn" class="special-btn">💋 KISS!</button>
+                <label class="upload-btn" for="avatar-upload">📷 Face</label>
+                <input type="file" id="avatar-upload" class="upload-input" accept="image/*">
+            </div>
+            
+            <div id="chat-box">
+                <div id="messages"><div><b>Host:</b> Welcome Dev! Link with Kalina's device to begin your date.</div></div>
+                <div id="chat-input-area">
+                    <input type="text" id="chat-input" placeholder="Type message or 😘..." autocomplete="off">
+                    <button id="send-btn">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('dinerCanvas');
+        const ctx = canvas.getContext('2d');
+        const messagesDiv = document.getElementById('messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const rideBikeBtn = document.getElementById('ride-bike-btn');
+        const enterDinerBtn = document.getElementById('enter-diner-btn');
+        const questionBtn = document.getElementById('question-btn');
+        const ambushBtn = document.getElementById('ambush-btn');
+        const shootBtn = document.getElementById('shoot-btn');
+        const kissBtn = document.getElementById('kiss-btn');
+        const avatarUpload = document.getElementById('avatar-upload');
+        const loveScoreSpan = document.getElementById('love-score');
+        const locationStatus = document.getElementById('location-status');
+        const connStatus = document.getElementById('conn-status');
+        const promptDisplay = document.getElementById('prompt-display');
+        const myPeerIdSpan = document.getElementById('my-peer-id');
+        const partnerIdInput = document.getElementById('partner-id-input');
+        const connectBtn = document.getElementById('connect-btn');
+        const joystickArea = document.getElementById('joystick-area');
+        const joystickKnob = document.getElementById('joystick-knob');
+
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+
+        const randomId = Math.floor(1000 + Math.random() * 9000).toString();
+        peer = new Peer('diner-' + randomId);
+
+        peer.on('open', (id) => {
+            myPeerIdSpan.innerText = id.replace('diner-', '');
+            isHost = true;
+        });
+
+        peer.on('connection', (connection) => {
+            conn = connection;
+            isHost = true;
+            setupConnection();
+            connStatus.innerText = "Linked! ❤️";
+            connStatus.style.color = "#2ed573";
+            addSystemMsg("Kalina joined your date session!");
+        });
+
+        connectBtn.addEventListener('click', () => {
+            const targetId = 'diner-' + partnerIdInput.value.trim();
+            conn = peer.connect(targetId);
+            isHost = false;
+            setupConnection();
+        });
+
+        function setupConnection() {
+            conn.on('open', () => {
+                connStatus.innerText = "Linked! ❤️";
+                connStatus.style.color = "#2ed573";
+                addSystemMsg("Connected with Dev!");
+            });
+            conn.on('data', (data) => { handleNetworkData(data); });
+        }
+
+        function sendData(data) {
+            if (conn && conn.open) conn.send(data);
+        }
+
+        let loveScore = 0;
+        let gameMode = "pickup"; // 'pickup', 'riding', 'outside-diner', 'inside-diner', 'ambush', 'kiss'
+        let cutsceneTimer = 0;
+        let activeFood = null;
+        let customAvatarImg = null;
+
+        let devChar = { x: 80, y: 170, name: "Dev", danceTimer: 0 };
+        let kalinaChar = { x: 130, y: 170, name: "Kalina" };
+
+        let thugs = [{ x: -30, y: 170, active: false }, { x: -60, y: 170, active: false }];
+
+        let joystickActive = false;
+        let joystickMoveX = 0;
+
+        joystickArea.addEventListener('pointerdown', () => { joystickActive = true; });
+        window.addEventListener('pointermove', (e) => {
+            if (!joystickActive) return;
+            const rect = joystickArea.getBoundingClientRect();
+            let x = e.clientX - (rect.left + rect.width / 2);
+            x = Math.max(-25, Math.min(25, x));
+            joystickKnob.style.transform = `translate(${x}px, 0px)`;
+            joystickMoveX = x / 25;
+        });
+        window.addEventListener('pointerup', () => {
+            joystickActive = false;
+            joystickMoveX = 0;
+            joystickKnob.style.transform = `translate(0px, 0px)`;
+        });
+
+        avatarUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() { customAvatarImg = img; }
+                    img.src = event.target.result;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function addSystemMsg(txt) {
+            const msg = document.createElement('div');
+            msg.innerHTML = `<b>System:</b> ${txt}`;
+            messagesDiv.appendChild(msg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function addMessage(sender, text, isRemote = false) {
+            const msg = document.createElement('div');
+            msg.innerHTML = `<b>${sender}:</b> ${text}`;
+            messagesDiv.appendChild(msg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            if (text.includes("😘") || text.includes("💋") || text.toLowerCase().includes("love")) {
+                devChar.danceTimer = 150;
+                if (loveScore < 3) {
+                    loveScore++;
+                    loveScoreSpan.innerText = loveScore;
+                    if (loveScore === 3) kissBtn.style.display = "inline-block";
+                }
+            }
+            if (!isRemote) sendData({ type: 'chat', sender: sender, text: text });
+        }
+
+        function handleNetworkData(data) {
+            if (data.type === 'chat') addMessage(data.sender, data.text, true);
+            else if (data.type === 'pos') {
+                if (isHost) kalinaChar.x = data.x;
+                else devChar.x = data.x;
+                gameMode = data.mode;
+            } else if (data.type === 'action') {
+                if (data.action === 'ride') startBikeRide(true);
+                if (data.action === 'enter') enterDiner(true);
+                if (data.action === 'food') activeFood = data.food;
+                if (data.action === 'ambush') triggerAmbush(true);
+                if (data.action === 'kiss') triggerKiss(true);
+            }
+        }
+
+        rideBikeBtn.addEventListener('click', () => { startBikeRide(false); });
+
+        function startBikeRide(remoteCall) {
+            gameMode = "riding";
+            locationStatus.innerText = "On Midnight Motorcycle";
+            promptDisplay.innerText = "🏍️ Riding through the night city streets to the Midnight Diner...";
+            rideBikeBtn.style.display = "none";
+            setTimeout(() => {
+                gameMode = "outside-diner";
+                locationStatus.innerText = "Outside Diner";
+                promptDisplay.innerText = "✨ Arrived! Tap 'Enter Diner' to go inside.";
+                enterDinerBtn.style.display = "inline-block";
+                devChar.x = 100; kalinaChar.x = 140;
+            }, 3000);
+            if (!remoteCall) sendData({ type: 'action', action: 'ride' });
+        }
+
+        enterDinerBtn.addEventListener('click', () => { enterDiner(false); });
+
+        function enterDiner(remoteCall) {
+            gameMode = "inside-diner";
+            locationStatus.innerText = "Inside Diner Table";
+            promptDisplay.innerText = "✨ Seated at the wooden table with a waiter ready! Order food or chat.";
+            enterDinerBtn.style.display = "none";
+            document.querySelectorAll('.menu-btn').forEach(b => b.style.display = "inline-block");
+            questionBtn.style.display = "inline-block";
+            devChar.x = 130; kalinaChar.x = 290;
+            addSystemMsg("You and Kalina sit across the restaurant table.");
+            if (!remoteCall) sendData({ type: 'action', action: 'enter' });
+        }
+
+        questionBtn.addEventListener('click', () => {
+            addMessage("System", `💬 Date Question: "What was your favorite moment of us this month?"`);
+        });
+
+        ambushBtn.addEventListener('click', () => { triggerAmbush(false); });
+
+        function triggerAmbush(remoteCall) {
+            gameMode = "ambush";
+            promptDisplay.innerText = "🚨 THUGS WITH KNIVES ATTACKING!";
+            shootBtn.style.display = "inline-block";
+            ambushBtn.style.display = "none";
+            thugs[0].active = true; thugs[0].x = 10;
+            thugs[1].active = true; thugs[1].x = -20;
+            if (!remoteCall) sendData({ type: 'action', action: 'ambush' });
+        }
+
+        shootBtn.addEventListener('click', () => {
+            if (thugs[0].active) thugs[0].active = false;
+            else if (thugs[1].active) {
+                thugs[1].active = false;
+                shootBtn.style.display = "none";
+                gameMode = "inside-diner";
+                promptDisplay.innerText = "✅ Thugs cleared by Dev!";
+            }
+        });
+
+        function triggerKiss(remoteCall) {
+            gameMode = "kiss";
+            cutsceneTimer = 0;
+            if (!remoteCall) sendData({ type: 'action', action: 'kiss' });
+        }
+
+        kissBtn.addEventListener('click', () => { triggerKiss(false); });
+
+        document.querySelectorAll('.menu-btn').forEach(btn => {
+            if(btn.id !== 'enter-diner-btn') {
+                btn.addEventListener('click', (e) => {
+                    activeFood = e.target.getAttribute('data-food');
+                    addMessage("Dev", `Ordered ${activeFood} for us!`);
+                    setTimeout(() => addMessage("Kalina", "Thank you baby, looks delicious! 😘❤️"), 1000);
+                });
+            }
+        });
+
+        sendBtn.addEventListener('click', () => {
+            if (chatInput.value.trim() !== "") {
+                const name = isHost ? "Dev" : "Kalina";
+                addMessage(name, chatInput.value);
+                chatInput.value = "";
+            }
+        });
+
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && chatInput.value.trim() !== "") {
+                const name = isHost ? "Dev" : "Kalina";
+                addMessage(name, chatInput.value);
+                chatInput.value = "";
+            }
+        });
+
+        function updateGame() {
+            if (joystickMoveX !== 0) {
+                if (isHost) {
+                    devChar.x += joystickMoveX * 2;
+                    sendData({ type: 'pos', x: devChar.x, y: devChar.y, mode: gameMode });
+                } else {
+                    kalinaChar.x += joystickMoveX * 2;
+                    sendData({ type: 'pos', x: kalinaChar.x, y: kalinaChar.y, mode: gameMode });
+                }
+            }
+        }
+
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            updateGame();
+
+            if (gameMode === "pickup") {
+                // Kalina's house exterior
+                ctx.fillStyle = "#111"; ctx.fillRect(0, 0, canvas.width, 200);
+                ctx.fillStyle = "#2c2c35"; ctx.fillRect(250, 80, 140, 110); // house
+                ctx.fillStyle = "#e74c3c"; ctx.fillRect(300, 130, 40, 60); // door
+            } else if (gameMode === "riding") {
+                // Motorcycle highway ride animation background
+                ctx.fillStyle = "#050508"; ctx.fillRect(0, 0, canvas.width, 200);
+                ctx.fillStyle = "#f1c40f"; ctx.fillRect(0, 185, canvas.width, 5); // road dashes
+            } else {
+                // Inside Diner with Table and Waiter NPC
+                ctx.fillStyle = gameMode === "ambush" ? "#1a0505" : "#120f18";
+                ctx.fillRect(0, 0, canvas.width, 170);
+                
+                // Wooden Restaurant Table
+                ctx.fillStyle = "#3e2723"; ctx.fillRect(160, 150, 130, 25);
+
+                // Waiter NPC standing nearby
+                ctx.fillStyle = "#7f8c8d"; ctx.fillRect(215, 115, 20, 35);
+                ctx.fillStyle = "#ecf0f1"; ctx.fillRect(221, 110, 8, 8);
+                ctx.fillStyle = "white"; ctx.font = "7px monospace"; ctx.fillText("Waiter", 212, 108);
+
+                if (activeFood) {
+                    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(225, 152, 6, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+
+            // Draw Dev
+            let bY = 0, bX = 0;
+            if (devChar.danceTimer > 0) {
+                bY = Math.sin(devChar.danceTimer * 0.5) * 3;
+                devChar.danceTimer--;
+            }
+            ctx.fillStyle = "#d35400"; ctx.fillRect(devChar.x - 14, devChar.y - 18 + bY, 28, 26);
+            ctx.fillStyle = "#c0392b"; ctx.fillRect(devChar.x - 10, devChar.y - 9 + bY, 20, 16);
+            ctx.fillStyle = "#f39c12"; ctx.beginPath(); ctx.arc(devChar.x, devChar.y - 23 + bY, 8, 0, Math.PI * 2); ctx.fill();
+            if (devChar.danceTimer > 0) {
+                ctx.fillStyle = "#ff4757"; ctx.font = "7px monospace"; ctx.fillText("😍", devChar.x - 4, devChar.y - 25 + bY);
+            }
+            ctx.fillStyle = "white"; ctx.font = "8px monospace"; ctx.fillText("Dev", devChar.x - 12, devChar.y + 16);
+
+            // Draw Kalina
+            ctx.fillStyle = "#f5b041"; ctx.fillRect(kalinaChar.x - 12, kalinaChar.y - 18, 24, 26);
+            ctx.fillStyle = "#8e44ad"; ctx.fillRect(kalinaChar.x - 10, kalinaChar.y - 9, 20, 16);
+            ctx.fillStyle = "#f5b041"; ctx.beginPath(); ctx.arc(kalinaChar.x, kalinaChar.y - 23, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#ff9ff3"; ctx.font = "8px monospace"; ctx.fillText("Kalina", kalinaChar.x - 16, kalinaChar.y + 16);
+
+            if (gameMode === "kiss") {
+                ctx.fillStyle = "rgba(255, 107, 129, 0.25)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.font = "16px monospace"; ctx.fillText("💖", 210, 100 - (cutsceneTimer % 40));
+            }
+
+            requestAnimationFrame(drawScene);
+        }
+
+        drawScene();
+    </script>
+</body>
+</html>
